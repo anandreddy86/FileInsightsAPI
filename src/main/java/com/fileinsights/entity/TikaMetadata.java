@@ -18,6 +18,17 @@ public class TikaMetadata {
     // A map to store any additional metadata fields
     private Map<String, String> metadataMap = new HashMap<>();
 
+    // Default constructor
+    public TikaMetadata() {}
+
+    // Constructor with parameters for easy initialization
+    public TikaMetadata(String filePath, String fileName, String content, Map<String, String> metadataMap) {
+        this.filePath = filePath;
+        this.fileName = fileName;
+        this.content = content;
+        this.metadataMap = metadataMap;
+    }
+
     // Getter and setter for filePath (or the unique identifier)
     public String getFilePath() {
         return filePath;

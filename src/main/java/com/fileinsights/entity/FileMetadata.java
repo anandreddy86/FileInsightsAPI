@@ -11,13 +11,22 @@ public class FileMetadata {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    private String path;
-    private String name;
-    private long size;
-    private long ctime;
-    private long mtime;
-    private long atime;
+
+    private String path; // Full file path
+    private String name; // Original file name
+    private long size; // File size in bytes
+    private long ctime; // File creation time
+    private long mtime; // File modification time
+    private long atime; // File access time
+
+    // Getter and Setter for 'id'
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     // Getter and Setter for 'path'
     public String getPath() {

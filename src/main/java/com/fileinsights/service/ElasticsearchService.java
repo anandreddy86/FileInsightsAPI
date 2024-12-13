@@ -20,6 +20,11 @@ public class ElasticsearchService {
      * @throws Exception If there is an error saving metadata to Elasticsearch.
      */
     public void saveTikaMetadata(TikaMetadata tikaMetadata) throws Exception {
+        if (tikaMetadata.getFilePath() == null || tikaMetadata.getFilePath().isEmpty()) {
+            throw new IllegalArgumentException("File path must not be null or empty for Elasticsearch indexing.");
+        }
+
+        // Index metadata with file path as the unique identifier
         elasticsearchClient.index(request -> request
                 .index(INDEX_NAME)
                 .id(tikaMetadata.getFilePath()) // Use file path as unique identifier
