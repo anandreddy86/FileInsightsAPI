@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,5 +159,71 @@ public class FileMetadataService {
         } else {
             throw new IllegalArgumentException("Provided path is not a directory: " + folder.getAbsolutePath());
         }
+    }
+
+    /**
+     * Get all metadata for files in a specific folder.
+     *
+     * @param folderPath The folder path to retrieve metadata from.
+     * @return A list of FileMetadata for all files in the folder.
+     */
+    public List<FileMetadata> getMetadataForFolder(String folderPath) {
+        List<FileMetadata> metadataList = new ArrayList<>();
+        File folder = new File(folderPath);
+
+        if (folder.exists() && folder.isDirectory()) {
+            try {
+                // Recursively process folder and subfolders
+                File[] files = folder.listFiles();
+                if (files != null) {
+                    metadataList = getMetadataForFiles(files);
+                }
+            } catch (Exception e) {
+                logger.error("Error retrieving metadata for folder: {}", folderPath, e);
+            }
+        } else {
+            logger.warn("The provided folder path is invalid or not a directory: {}", folderPath);
+        }
+
+        return metadataList; // Return an empty list if no metadata is found
+    }
+
+    /**
+     * Helper method to extract metadata for an array of files.
+     *
+     * @param files The array of File objects.
+     * @return A list of FileMetadata objects.
+     */
+    private List<FileMetadata> getMetadataForFiles(File[] files) {
+        List<FileMetadata> metadataList = new ArrayList<>();
+        for (File file : files) {
+            if (file.isFile()) {
+                // Fetch metadata for each file based on its absolute path
+                FileMetadata metadata = fileMetadataRepository.findByPath(file.getAbsolutePath());
+                if (metadata != null) {
+                    metadataList.add(metadata);
+                }
+            } else if (file.isDirectory()) {
+                // Recursively fetch metadata from subfolders
+                metadataList.addAll(getMetadataForFolder(file.getAbsolutePath()));
+            }
+        }
+        return metadataList;
+    }
+
+    /**
+     * Helper method to extract file paths from an array of File objects.
+     *
+     * @param files The array of File objects.
+     * @return A list of file paths as strings.
+     */
+    private List<String> getFilePaths(File[] files) {
+        List<String> paths = new ArrayList<>();
+        for (File file : files) {
+            if (file.isFile()) {
+                paths.add(file.getAbsolutePath());
+            }
+        }
+        return paths;
     }
 }

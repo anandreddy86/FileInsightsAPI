@@ -1,18 +1,29 @@
 package com.fileinsights.api;
 
+import com.fileinsights.entity.FileMetadata;
+import com.fileinsights.entity.TikaMetadata;
+import com.fileinsights.service.FileMetadataService;
 import com.fileinsights.service.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/files")
 public class FileController {
 
+    private static final Logger logger = LoggerFactory.getLogger(FileController.class);
+
     @Autowired
     private FileService fileService;
+
+    @Autowired
+    private FileMetadataService fileMetadataService;
 
     /**
      * Endpoint to process a folder and extract metadata.
@@ -23,11 +34,54 @@ public class FileController {
     @PostMapping("/process")
     public ResponseEntity<String> processFolder(@RequestParam String folderPath) {
         File folder = new File(folderPath);
+
         if (folder.exists() && folder.isDirectory()) {
-            fileService.processFolder(folder);
-            return ResponseEntity.ok("Folder processed successfully.");
+            try {
+                fileService.processFolder(folder); // Process and store metadata
+                return ResponseEntity.ok("Folder processed successfully.");
+            } catch (Exception e) {
+                logger.error("Error processing folder: {}", folderPath, e);
+                return ResponseEntity.status(500).body("Error processing folder: " + e.getMessage());
+            }
         } else {
+            logger.warn("Invalid folder path: {}", folderPath);
             return ResponseEntity.badRequest().body("Invalid folder path.");
+        }
+    }
+
+    /**
+     * Endpoint to get metadata (Basic or Advanced) of all files in a folder.
+     *
+     * @param folderPath Path to the folder whose metadata to retrieve.
+     * @param type       Metadata type: "basic" (MySQL) or "advanced" (Elasticsearch).
+     * @return ResponseEntity with the metadata.
+     */
+    @GetMapping("/metadata")
+    public ResponseEntity<?> getFolderMetadata(@RequestParam String folderPath,
+                                               @RequestParam(defaultValue = "basic") String type) {
+        try {
+            if ("advanced".equalsIgnoreCase(type)) {
+                logger.info("Fetching advanced metadata for folder: {}", folderPath);
+                List<TikaMetadata> advancedMetadata = fileService.getAdvancedMetadata(folderPath);
+                if (advancedMetadata != null && !advancedMetadata.isEmpty()) {
+                    return ResponseEntity.ok(advancedMetadata);
+                } else {
+                    logger.info("No advanced metadata found for folder: {}", folderPath);
+                    return ResponseEntity.notFound().build();
+                }
+            } else {
+                logger.info("Fetching basic metadata for folder: {}", folderPath);
+                List<FileMetadata> basicMetadata = fileMetadataService.getMetadataForFolder(folderPath);
+                if (basicMetadata != null && !basicMetadata.isEmpty()) {
+                    return ResponseEntity.ok(basicMetadata);
+                } else {
+                    logger.info("No basic metadata found for folder: {}", folderPath);
+                    return ResponseEntity.notFound().build();
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error retrieving metadata for folder: {}", folderPath, e);
+            return ResponseEntity.status(500).body("Error retrieving metadata: " + e.getMessage());
         }
     }
 }

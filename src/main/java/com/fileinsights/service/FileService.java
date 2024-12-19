@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.util.List;
 
 @Service
 public class FileService {
@@ -44,18 +45,34 @@ public class FileService {
      */
     private void processFile(File file) {
         try {
-            // Step 1: Extract basic file metadata, using the original file name
+            // Step 1: Extract basic file metadata and save to MySQL
             FileMetadata fileMetadata = fileMetadataService.extractMetadata(file, file.getName());
             fileMetadataService.saveFileMetadata(fileMetadata);
 
-            // Step 2: Extract advanced metadata using Tika, passing the original file name
-            TikaMetadata tikaMetadata = TikaUtils.extractTikaMetadata(file, file.getName()); // Pass original file name
+            // Step 2: Extract advanced metadata using Tika and save to Elasticsearch
+            TikaMetadata tikaMetadata = TikaUtils.extractTikaMetadata(file, file.getName());
             elasticsearchService.saveTikaMetadata(tikaMetadata);
 
         } catch (Exception e) {
             // Log the error and proceed with the next file
             System.err.println("Error processing file: " + file.getAbsolutePath());
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Fetches advanced metadata for a given folder from Elasticsearch.
+     *
+     * @param folderPath The folder path to query for advanced metadata.
+     * @return List of TikaMetadata objects.
+     */
+    public List<TikaMetadata> getAdvancedMetadata(String folderPath) {
+        try {
+            return elasticsearchService.getMetadataByFolderPath(folderPath);
+        } catch (Exception e) {
+            System.err.println("Error fetching advanced metadata: " + e.getMessage());
+            e.printStackTrace();
+            return null;
         }
     }
 }
