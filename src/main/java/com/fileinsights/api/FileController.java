@@ -4,6 +4,7 @@ import com.fileinsights.entity.FileMetadata;
 import com.fileinsights.entity.TikaMetadata;
 import com.fileinsights.service.FileMetadataService;
 import com.fileinsights.service.FileService;
+import com.fileinsights.service.ElasticsearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,9 @@ public class FileController {
 
     @Autowired
     private FileMetadataService fileMetadataService;
+
+    @Autowired
+    private ElasticsearchService elasticsearchService;
 
     /**
      * Endpoint to process a folder and extract metadata.
@@ -82,6 +86,30 @@ public class FileController {
         } catch (Exception e) {
             logger.error("Error retrieving metadata for folder: {}", folderPath, e);
             return ResponseEntity.status(500).body("Error retrieving metadata: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Endpoint to reset the index for a folder path.
+     *
+     * @param folderPath Path to the folder whose metadata needs to be cleared.
+     * @return ResponseEntity with a success or error message.
+     */
+    @DeleteMapping("/reset-index")
+    public ResponseEntity<String> resetIndex(@RequestParam String folderPath) {
+        try {
+            // Delete from MySQL
+            logger.info("Resetting MySQL metadata for folder: {}", folderPath);
+            fileMetadataService.deleteMetadataForFolder(folderPath);
+
+            // Delete from Elasticsearch
+            logger.info("Resetting Elasticsearch metadata for folder: {}", folderPath);
+            elasticsearchService.deleteByPath(folderPath);
+
+            return ResponseEntity.ok("Index reset successfully for folder: " + folderPath);
+        } catch (Exception e) {
+            logger.error("Error resetting index for folder: {}", folderPath, e);
+            return ResponseEntity.status(500).body("Error resetting index: " + e.getMessage());
         }
     }
 }

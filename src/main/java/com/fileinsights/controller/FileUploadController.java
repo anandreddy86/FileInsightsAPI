@@ -19,7 +19,12 @@ public class FileUploadController {
 
     private static final Logger logger = LoggerFactory.getLogger(FileUploadController.class);
 
-    // Endpoint to handle single file uploads
+    /**
+     * Endpoint to handle single file uploads.
+     * 
+     * @param file MultipartFile uploaded by the user.
+     * @return ResponseEntity with success or error message.
+     */
     @PostMapping
     public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
@@ -47,7 +52,12 @@ public class FileUploadController {
         }
     }
 
-    // New endpoint to handle folder path uploads
+    /**
+     * New endpoint to handle folder path uploads.
+     * 
+     * @param folderPath Path of the folder to process.
+     * @return ResponseEntity with success or error message.
+     */
     @PostMapping("/folder")
     public ResponseEntity<String> uploadFolder(@RequestParam("folderPath") String folderPath) {
         try {
