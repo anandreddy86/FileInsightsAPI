@@ -1,6 +1,10 @@
 package com.fileinsights.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import java.util.Date;
+import java.util.Objects;
 
 @Entity
 @Table(name = "file_metadata", uniqueConstraints = {
@@ -12,19 +16,29 @@ public class FileMetadata {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false) // Ensure non-null for unique constraints
+    @Column(nullable = false, length = 1024)
+    @NotBlank
+    @Size(max = 1024)
     private String path; // Full file path
 
-    @Column(nullable = false) // Ensure non-null for unique constraints
+    @Column(nullable = false, length = 255)
+    @NotBlank
+    @Size(max = 255)
     private String name; // Original file name
 
+    @Column(nullable = false)
     private long size; // File size in bytes
-    private long ctime; // File creation time
-    private long mtime; // File modification time
-    private long atime; // File access time
 
-    // Getters and Setters for all fields...
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date ctime; // File creation time
 
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date mtime; // File modification time
+
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date atime; // File access time
+
+    // Getters and Setters
     public Long getId() {
         return id;
     }
@@ -54,30 +68,61 @@ public class FileMetadata {
     }
 
     public void setSize(long size) {
+        if (size < 0) {
+            throw new IllegalArgumentException("File size cannot be negative.");
+        }
         this.size = size;
     }
 
-    public long getCtime() {
+    public Date getCtime() {
         return ctime;
     }
 
-    public void setCtime(long ctime) {
+    public void setCtime(Date ctime) {
         this.ctime = ctime;
     }
 
-    public long getMtime() {
+    public Date getMtime() {
         return mtime;
     }
 
-    public void setMtime(long mtime) {
+    public void setMtime(Date mtime) {
         this.mtime = mtime;
     }
 
-    public long getAtime() {
+    public Date getAtime() {
         return atime;
     }
 
-    public void setAtime(long atime) {
+    public void setAtime(Date atime) {
         this.atime = atime;
+    }
+
+    // Override toString, equals, and hashCode
+    @Override
+    public String toString() {
+        return "FileMetadata{" +
+                "id=" + id +
+                ", path='" + path + '\'' +
+                ", name='" + name + '\'' +
+                ", size=" + size +
+                ", ctime=" + ctime +
+                ", mtime=" + mtime +
+                ", atime=" + atime +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        FileMetadata that = (FileMetadata) o;
+        return Objects.equals(path, that.path) &&
+                Objects.equals(name, that.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(path, name);
     }
 }

@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Date;
 import java.util.List;
 
 @Service
@@ -118,9 +119,12 @@ public class FileMetadataService {
         FileMetadata metadata = new FileMetadata();
         metadata.setName(originalFileName);
         metadata.setSize(file.length());
-        metadata.setCtime(file.lastModified());
-        metadata.setMtime(file.lastModified());
-        metadata.setAtime(file.lastModified());
+
+        // Convert long to Date for ctime, mtime, and atime
+        Date fileDate = new Date(file.lastModified());
+        metadata.setCtime(fileDate);
+        metadata.setMtime(fileDate);
+        metadata.setAtime(fileDate);
 
         // Set the path
         metadata.setPath(file.getAbsolutePath());

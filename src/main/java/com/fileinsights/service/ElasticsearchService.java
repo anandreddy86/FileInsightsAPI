@@ -3,20 +3,20 @@ package com.fileinsights.service;
 import com.fileinsights.entity.TikaMetadata;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.Conflicts;
-import co.elastic.clients.elasticsearch._types.query_dsl.Query;
-import co.elastic.clients.elasticsearch.core.DeleteByQueryRequest;
-import co.elastic.clients.elasticsearch.core.DeleteByQueryResponse;
-import co.elastic.clients.elasticsearch.core.DeleteRequest;
-import co.elastic.clients.elasticsearch.core.DeleteResponse;
-import co.elastic.clients.elasticsearch.core.SearchRequest;
-import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
+import co.elastic.clients.elasticsearch._types.aggregations.StringTermsAggregate;
+import co.elastic.clients.elasticsearch._types.aggregations.StringTermsBucket;
+import co.elastic.clients.elasticsearch.core.*;
+import co.elastic.clients.elasticsearch.core.search.Hit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,17 +29,14 @@ public class ElasticsearchService {
     private ElasticsearchClient elasticsearchClient;
 
     /**
-     * Saves Tika metadata to Elasticsearch.
-     *
-     * @param tikaMetadata The metadata to index.
-     * @throws Exception If there is an error saving metadata to Elasticsearch.
+     * Save Tika metadata to Elasticsearch.
      */
     public void saveTikaMetadata(TikaMetadata tikaMetadata) throws Exception {
         if (tikaMetadata.getFilePath() == null || tikaMetadata.getFilePath().isEmpty()) {
             throw new IllegalArgumentException("File path must not be null or empty for Elasticsearch indexing.");
         }
 
-        elasticsearchClient.index(request -> request
+        elasticsearchClient.index(i -> i
                 .index(INDEX_NAME)
                 .id(tikaMetadata.getFilePath())
                 .document(tikaMetadata)
@@ -48,51 +45,41 @@ public class ElasticsearchService {
     }
 
     /**
-     * Retrieves Tika metadata for a given folder path from Elasticsearch.
-     *
-     * @param folderPath The folder path to query for metadata.
-     * @return List of TikaMetadata objects.
-     * @throws IOException If there is an error querying Elasticsearch.
+     * Retrieve metadata by folder path.
      */
     public List<TikaMetadata> getMetadataByFolderPath(String folderPath) throws IOException {
-        Query query = Query.of(q -> q
+        var query = co.elastic.clients.elasticsearch._types.query_dsl.Query.of(q -> q
                 .wildcard(w -> w
-                        .field("filePath.keyword") // Use keyword field for exact matching
-                        .value(folderPath + "*")  // Match folderPath and its subpaths
+                        .field("filePath.keyword")
+                        .value(folderPath + "*")
                 )
         );
 
-        SearchRequest searchRequest = new SearchRequest.Builder()
+        var searchRequest = new SearchRequest.Builder()
                 .index(INDEX_NAME)
                 .query(query)
                 .build();
 
-        logger.info("Executing Elasticsearch query for folder path: {}", folderPath);
-
-        SearchResponse<TikaMetadata> response = elasticsearchClient.search(searchRequest, TikaMetadata.class);
-
+        var response = elasticsearchClient.search(searchRequest, TikaMetadata.class);
         logger.info("Retrieved {} metadata records for folder path: {}", response.hits().hits().size(), folderPath);
 
         return response.hits().hits().stream()
-                .map(hit -> hit.source())
+                .map(Hit::source)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Deletes Tika metadata by file path from Elasticsearch.
-     *
-     * @param filePath The file path whose metadata is to be deleted.
-     * @throws IOException If there is an error deleting metadata from Elasticsearch.
+     * Delete metadata by file path.
      */
     public void deleteMetadataByFilePath(String filePath) throws IOException {
-        DeleteRequest deleteRequest = new DeleteRequest.Builder()
+        var deleteRequest = new DeleteRequest.Builder()
                 .index(INDEX_NAME)
                 .id(filePath)
                 .build();
 
-        DeleteResponse deleteResponse = elasticsearchClient.delete(deleteRequest);
+        var deleteResponse = elasticsearchClient.delete(deleteRequest);
 
-        if ("not_found".equalsIgnoreCase(deleteResponse.result().name())) {
+        if ("not_found".equalsIgnoreCase(deleteResponse.result().jsonValue())) {
             logger.warn("No document found for file path: {}", filePath);
         } else {
             logger.info("Metadata deleted successfully for file path: {}", filePath);
@@ -100,9 +87,7 @@ public class ElasticsearchService {
     }
 
     /**
-     * Deletes Tika metadata for multiple file paths from Elasticsearch.
-     *
-     * @param filePaths The list of file paths whose metadata is to be deleted.
+     * Bulk delete metadata by file paths.
      */
     public void deleteMetadataByFilePaths(List<String> filePaths) {
         for (String filePath : filePaths) {
@@ -115,37 +100,56 @@ public class ElasticsearchService {
     }
 
     /**
-     * Deletes all Tika metadata associated with a folder path from Elasticsearch.
-     *
-     * @param folderPath The folder path to delete metadata from.
-     * @throws IOException If there is an error deleting metadata from Elasticsearch.
+     * Delete metadata by folder path.
      */
     public void deleteByPath(String folderPath) throws IOException {
-        Query query = Query.of(q -> q
+        var query = co.elastic.clients.elasticsearch._types.query_dsl.Query.of(q -> q
                 .wildcard(w -> w
-                        .field("filePath.keyword")  // Use keyword field for exact matching
-                        .value(folderPath + "*")   // Match all paths under the folder
+                        .field("filePath.keyword")
+                        .value(folderPath + "*")
                 )
         );
 
-        DeleteByQueryRequest deleteRequest = new DeleteByQueryRequest.Builder()
+        var deleteRequest = new DeleteByQueryRequest.Builder()
                 .index(INDEX_NAME)
                 .query(query)
-                .conflicts(Conflicts.Proceed) // Updated to use the enum correctly
+                .conflicts(Conflicts.Proceed)
                 .build();
 
-        try {
-            DeleteByQueryResponse response = elasticsearchClient.deleteByQuery(deleteRequest);
+        var response = elasticsearchClient.deleteByQuery(deleteRequest);
+        logger.info("Deleted {} documents for folder path: {}", response.deleted(), folderPath);
 
-            logger.info("Deleted {} documents for folder path: {}", response.deleted(), folderPath);
-            if (response.versionConflicts() > 0) {
-                logger.warn("Version conflicts encountered during deleteByQuery for folder: {}. Conflicts: {}",
-                        folderPath, response.versionConflicts());
-            }
-
-        } catch (IOException e) {
-            logger.error("Error occurred while deleting metadata for folder path: {}", folderPath, e);
-            throw e;
+        if (response.versionConflicts() > 0) {
+            logger.warn("Version conflicts encountered during deleteByQuery for folder: {}. Conflicts: {}",
+                    folderPath, response.versionConflicts());
         }
+    }
+
+    /**
+     * Count files by type using metadataMap.Content-Type.keyword field.
+     */
+    public Map<String, Long> countFilesByType() throws IOException {
+        var request = new SearchRequest.Builder()
+                .index(INDEX_NAME)
+                .size(0) // Only aggregation, no hits
+                .aggregations("fileTypes", Aggregation.of(a -> a.terms(t -> t.field("metadataMap.Content-Type.keyword").size(1000))))
+                .build();
+
+        var response = elasticsearchClient.search(request, Void.class);
+
+        Map<String, Long> fileTypeCounts = new HashMap<>();
+
+        StringTermsAggregate fileTypeAggregation = response.aggregations()
+                .get("fileTypes")
+                .sterms();
+
+        if (fileTypeAggregation != null && fileTypeAggregation.buckets() != null) {
+            for (StringTermsBucket bucket : fileTypeAggregation.buckets().array()) {
+                fileTypeCounts.put(bucket.key().stringValue(), bucket.docCount());
+            }
+        }
+
+        logger.info("File type aggregation result: {}", fileTypeCounts);
+        return fileTypeCounts;
     }
 }
