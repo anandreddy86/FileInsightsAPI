@@ -33,15 +33,17 @@ public class FileController {
      * Endpoint to process a folder and extract metadata.
      *
      * @param folderPath Path to the folder to process.
+     * @param pathType   The path type: "Local", "NFS", or "SMB".
      * @return ResponseEntity with a success message.
      */
     @PostMapping("/process")
-    public ResponseEntity<String> processFolder(@RequestParam String folderPath) {
+    public ResponseEntity<String> processFolder(@RequestParam String folderPath, 
+                                                @RequestParam(defaultValue = "Local") String pathType) {
         File folder = new File(folderPath);
 
         if (folder.exists() && folder.isDirectory()) {
             try {
-                fileService.processFolder(folder); // Process and store metadata
+                fileService.processFolder(folder, pathType); // Process and store metadata
                 return ResponseEntity.ok("Folder processed successfully.");
             } catch (Exception e) {
                 logger.error("Error processing folder: {}", folderPath, e);
@@ -58,15 +60,17 @@ public class FileController {
      *
      * @param folderPath Path to the folder whose metadata to retrieve.
      * @param type       Metadata type: "basic" (MySQL) or "advanced" (Elasticsearch).
+     * @param pathType   The path type: "Local", "NFS", or "SMB".
      * @return ResponseEntity with the metadata.
      */
     @GetMapping("/metadata")
     public ResponseEntity<?> getFolderMetadata(@RequestParam String folderPath,
-                                               @RequestParam(defaultValue = "basic") String type) {
+                                               @RequestParam(defaultValue = "basic") String type,
+                                               @RequestParam(defaultValue = "Local") String pathType) {
         try {
             if ("advanced".equalsIgnoreCase(type)) {
                 logger.info("Fetching advanced metadata for folder: {}", folderPath);
-                List<TikaMetadata> advancedMetadata = fileService.getAdvancedMetadata(folderPath);
+                List<TikaMetadata> advancedMetadata = fileService.getAdvancedMetadata(folderPath, pathType);
                 if (advancedMetadata != null && !advancedMetadata.isEmpty()) {
                     return ResponseEntity.ok(advancedMetadata);
                 } else {
@@ -75,7 +79,7 @@ public class FileController {
                 }
             } else {
                 logger.info("Fetching basic metadata for folder: {}", folderPath);
-                List<FileMetadata> basicMetadata = fileMetadataService.getMetadataForFolder(folderPath);
+                List<FileMetadata> basicMetadata = fileMetadataService.getMetadataForFolder(folderPath, pathType);
                 if (basicMetadata != null && !basicMetadata.isEmpty()) {
                     return ResponseEntity.ok(basicMetadata);
                 } else {

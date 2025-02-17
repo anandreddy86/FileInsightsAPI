@@ -27,16 +27,17 @@ public class FileService {
      * Processes the given folder and extracts metadata for each file.
      *
      * @param folder The folder to process.
+     * @param pathType The type of the path (Local, NFS, SMB).
      */
-    public void processFolder(File folder) {
+    public void processFolder(File folder, String pathType) {
         if (folder.isDirectory()) {
             File[] files = folder.listFiles();
             if (files != null) {
                 for (File file : files) {
                     if (file.isFile()) {
-                        processFile(file); // Process individual files
+                        processFile(file, pathType); // Process individual files
                     } else if (file.isDirectory()) {
-                        processFolder(file); // Recursively process subfolders
+                        processFolder(file, pathType); // Recursively process subfolders
                     }
                 }
             } else {
@@ -51,11 +52,12 @@ public class FileService {
      * Processes a single file by extracting and saving its metadata.
      *
      * @param file The file to process.
+     * @param pathType The type of the path (Local, NFS, SMB).
      */
-    private void processFile(File file) {
+    private void processFile(File file, String pathType) {
         try {
             // Step 1: Extract basic file metadata and save to MySQL
-            FileMetadata fileMetadata = fileMetadataService.extractMetadata(file, file.getName());
+            FileMetadata fileMetadata = fileMetadataService.extractMetadata(file, file.getName(), pathType);
             fileMetadataService.saveFileMetadata(fileMetadata);
 
             // Step 2: Extract advanced metadata using Tika and save to Elasticsearch
@@ -78,7 +80,7 @@ public class FileService {
             // Delete metadata from MySQL
             FileMetadata fileMetadata = fileMetadataService.getMetadataByPath(filePath);
             if (fileMetadata != null) {
-                fileMetadataService.deleteMetadata(fileMetadata.getId());
+                fileMetadataService.deleteMetadata(fileMetadata.getId());  // Pass the Long ID for deletion
                 logger.info("Deleted metadata from MySQL for file: {}", filePath);
             } else {
                 logger.warn("No MySQL metadata found for file: {}", filePath);
@@ -123,12 +125,13 @@ public class FileService {
      * Fetches advanced metadata for a given folder from Elasticsearch.
      *
      * @param folderPath The folder path to query for advanced metadata.
+     * @param pathType   The type of the path (Local, NFS, SMB).
      * @return List of TikaMetadata objects.
      */
-    public List<TikaMetadata> getAdvancedMetadata(String folderPath) {
+    public List<TikaMetadata> getAdvancedMetadata(String folderPath, String pathType) {
         try {
             logger.info("Fetching advanced metadata for folder: {}", folderPath);
-            List<TikaMetadata> metadataList = elasticsearchService.getMetadataByFolderPath(folderPath);
+            List<TikaMetadata> metadataList = elasticsearchService.getMetadataByFolderPath(folderPath, pathType);
             if (metadataList != null && !metadataList.isEmpty()) {
                 logger.info("Fetched {} records from Elasticsearch.", metadataList.size());
             } else {

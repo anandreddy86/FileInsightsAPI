@@ -6,8 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
-
-//import javax.validation.Valid;
 import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
@@ -23,7 +21,7 @@ public class FileMetadataController {
     private FileMetadataService fileMetadataService;
 
     /**
-     * Endpoint to save file metadata.
+     * Endpoint to save file metadata, including metadata from NFS and SMB paths.
      *
      * @param fileMetadata The file metadata to save.
      * @return ResponseEntity indicating the result of the operation.
@@ -31,6 +29,7 @@ public class FileMetadataController {
     @PostMapping("/save")
     public ResponseEntity<?> saveMetadata(@Valid @RequestBody FileMetadata fileMetadata) {
         try {
+            // Save metadata along with path type (NFS, SMB, or Local)
             fileMetadataService.saveFileMetadata(fileMetadata);
             logger.info("File metadata saved successfully: {}", fileMetadata);
             return ResponseEntity.ok("File metadata saved successfully.");
@@ -64,18 +63,27 @@ public class FileMetadataController {
     }
 
     /**
-     * Endpoint to retrieve all file metadata with pagination.
+     * Endpoint to retrieve all file metadata with pagination, and filter by path type (NFS, SMB).
      *
      * @param page The page number (default is 0).
      * @param size The size of the page (default is 10).
+     * @param type The type of path (optional, can be LOCAL, NFS, SMB).
      * @return List of file metadata.
      */
     @GetMapping
     public ResponseEntity<?> getAllMetadata(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String type) {
         try {
-            List<FileMetadata> metadataList = fileMetadataService.getAllMetadata(page, size);
+            List<FileMetadata> metadataList;
+            if (type != null && !type.isEmpty()) {
+                // Fetch metadata by path type (NFS, SMB, Local)
+                metadataList = fileMetadataService.getAllMetadataByType(page, size, type);
+            } else {
+                // Fetch all metadata without filtering by type
+                metadataList = fileMetadataService.getAllMetadata(page, size);
+            }
             if (!metadataList.isEmpty()) {
                 logger.info("Retrieved {} metadata records for page {} with size {}", metadataList.size(), page, size);
                 return ResponseEntity.ok(metadataList);

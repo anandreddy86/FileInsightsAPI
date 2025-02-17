@@ -2,21 +2,19 @@ package com.fileinsights.service;
 
 import com.fileinsights.entity.TikaMetadata;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import co.elastic.clients.elasticsearch._types.Conflicts;
-import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
-import co.elastic.clients.elasticsearch._types.aggregations.StringTermsAggregate;
-import co.elastic.clients.elasticsearch._types.aggregations.StringTermsBucket;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch._types.aggregations.StringTermsAggregate;
+import co.elastic.clients.elasticsearch._types.aggregations.StringTermsBucket;
+import co.elastic.clients.elasticsearch.core.DeleteByQueryResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,13 +43,24 @@ public class ElasticsearchService {
     }
 
     /**
-     * Retrieve metadata by folder path.
+     * Retrieve metadata by folder path and path type.
      */
-    public List<TikaMetadata> getMetadataByFolderPath(String folderPath) throws IOException {
+    public List<TikaMetadata> getMetadataByFolderPath(String folderPath, String pathType) throws IOException {
+        // Modify query to include pathType (Local, NFS, SMB)
         var query = co.elastic.clients.elasticsearch._types.query_dsl.Query.of(q -> q
-                .wildcard(w -> w
-                        .field("filePath.keyword")
-                        .value(folderPath + "*")
+                .bool(b -> b
+                    .filter(
+                        f -> f.wildcard(w -> w
+                            .field("filePath.keyword") // Use `.keyword` to perform exact matching
+                            .value(folderPath + "*")
+                        )
+                    )
+                    .filter(
+                        f -> f.term(t -> t
+                            .field("pathType.keyword") // Assuming pathType is indexed
+                            .value(pathType) // Filtering by pathType
+                        )
+                    )
                 )
         );
 
@@ -61,7 +70,7 @@ public class ElasticsearchService {
                 .build();
 
         var response = elasticsearchClient.search(searchRequest, TikaMetadata.class);
-        logger.info("Retrieved {} metadata records for folder path: {}", response.hits().hits().size(), folderPath);
+        logger.info("Retrieved {} metadata records for folder path: {} and pathType: {}", response.hits().hits().size(), folderPath, pathType);
 
         return response.hits().hits().stream()
                 .map(Hit::source)
@@ -89,13 +98,24 @@ public class ElasticsearchService {
     /**
      * Bulk delete metadata by file paths.
      */
-    public void deleteMetadataByFilePaths(List<String> filePaths) {
+    public void deleteMetadataByFilePaths(List<String> filePaths) throws IOException {
+        BulkRequest.Builder bulkRequest = new BulkRequest.Builder();
+
         for (String filePath : filePaths) {
-            try {
-                deleteMetadataByFilePath(filePath);
-            } catch (IOException e) {
-                logger.error("Error deleting metadata for file path: {}", filePath, e);
-            }
+            bulkRequest.operations(op -> op
+                .delete(del -> del
+                    .index(INDEX_NAME)
+                    .id(filePath)
+                )
+            );
+        }
+
+        BulkResponse bulkResponse = elasticsearchClient.bulk(bulkRequest.build());
+
+        if (bulkResponse.errors()) {
+            logger.error("Errors occurred during bulk delete");
+        } else {
+            logger.info("Successfully deleted {} metadata records", bulkResponse.items().size());
         }
     }
 
@@ -113,10 +133,11 @@ public class ElasticsearchService {
         var deleteRequest = new DeleteByQueryRequest.Builder()
                 .index(INDEX_NAME)
                 .query(query)
-                .conflicts(Conflicts.Proceed)
+                .conflicts(co.elastic.clients.elasticsearch._types.Conflicts.Proceed)  // Handling conflicts
                 .build();
 
-        var response = elasticsearchClient.deleteByQuery(deleteRequest);
+        DeleteByQueryResponse response = elasticsearchClient.deleteByQuery(deleteRequest);
+
         logger.info("Deleted {} documents for folder path: {}", response.deleted(), folderPath);
 
         if (response.versionConflicts() > 0) {
@@ -132,7 +153,12 @@ public class ElasticsearchService {
         var request = new SearchRequest.Builder()
                 .index(INDEX_NAME)
                 .size(0) // Only aggregation, no hits
-                .aggregations("fileTypes", Aggregation.of(a -> a.terms(t -> t.field("metadataMap.Content-Type.keyword").size(1000))))
+                .aggregations("fileTypes", agg -> agg
+                        .terms(t -> t
+                                .field("metadataMap.Content-Type.keyword")
+                                .size(1000)
+                        )
+                )
                 .build();
 
         var response = elasticsearchClient.search(request, Void.class);

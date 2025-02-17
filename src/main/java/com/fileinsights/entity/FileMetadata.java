@@ -38,6 +38,25 @@ public class FileMetadata {
     @Temporal(TemporalType.TIMESTAMP)
     private Date atime; // File access time
 
+    // New fields for NFS/SMB support
+    @Column(nullable = true, length = 255)
+    private String nfsHost; // To store the NFS host
+
+    @Column(nullable = true, length = 255)
+    private String smbHost; // To store the SMB host
+
+    @Column(nullable = true, length = 255)
+    private String username; // To store the username for NFS/SMB
+
+    @Column(nullable = true, length = 255)
+    private String password; // To store the password for NFS/SMB
+
+    @Column(nullable = true, length = 1024)
+    private String sharePath; // To store the shared path for NFS/SMB
+
+    @Column(nullable = true, length = 50)
+    private String type; // Type of the file (Local, NFS, SMB)
+
     // Getters and Setters
     public Long getId() {
         return id;
@@ -98,6 +117,55 @@ public class FileMetadata {
         this.atime = atime;
     }
 
+    // New Getters and Setters for NFS/SMB fields
+    public String getNfsHost() {
+        return nfsHost;
+    }
+
+    public void setNfsHost(String nfsHost) {
+        this.nfsHost = nfsHost;
+    }
+
+    public String getSmbHost() {
+        return smbHost;
+    }
+
+    public void setSmbHost(String smbHost) {
+        this.smbHost = smbHost;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getSharePath() {
+        return sharePath;
+    }
+
+    public void setSharePath(String sharePath) {
+        this.sharePath = sharePath;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
     // Override toString, equals, and hashCode
     @Override
     public String toString() {
@@ -109,6 +177,12 @@ public class FileMetadata {
                 ", ctime=" + ctime +
                 ", mtime=" + mtime +
                 ", atime=" + atime +
+                ", nfsHost='" + nfsHost + '\'' +
+                ", smbHost='" + smbHost + '\'' +
+                ", username='" + username + '\'' +
+                ", password='" + password + '\'' +
+                ", sharePath='" + sharePath + '\'' +
+                ", type='" + type + '\'' +
                 '}';
     }
 

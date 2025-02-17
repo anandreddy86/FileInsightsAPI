@@ -56,10 +56,12 @@ public class FileUploadController {
      * New endpoint to handle folder path uploads.
      * 
      * @param folderPath Path of the folder to process.
+     * @param pathType   Type of the path (Local, NFS, SMB).
      * @return ResponseEntity with success or error message.
      */
     @PostMapping("/folder")
-    public ResponseEntity<String> uploadFolder(@RequestParam("folderPath") String folderPath) {
+    public ResponseEntity<String> uploadFolder(@RequestParam("folderPath") String folderPath, 
+                                               @RequestParam("pathType") String pathType) {
         try {
             // Validate the folder path
             File folder = new File(folderPath);
@@ -68,7 +70,7 @@ public class FileUploadController {
             }
 
             // Process the folder and extract metadata for all files inside the folder
-            fileMetadataService.processFolder(folder);
+            fileMetadataService.processFolder(folder, pathType); // Pass pathType here
 
             return ResponseEntity.ok("Folder processed and metadata extracted successfully.");
         } catch (Exception e) {
