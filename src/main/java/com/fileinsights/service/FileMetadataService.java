@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Date;
 import java.util.List;
 
@@ -115,16 +116,19 @@ public class FileMetadataService {
      * @param originalFileName The original file name.
      * @return Extracted file metadata.
      */
-    public FileMetadata extractMetadata(File file, String originalFileName) {
+    public FileMetadata extractMetadata(File file, String originalFileName) throws IOException {
         FileMetadata metadata = new FileMetadata();
         metadata.setName(originalFileName);
         metadata.setSize(file.length());
 
         // Convert long to Date for ctime, mtime, and atime
-        Date fileDate = new Date(file.lastModified());
-        metadata.setCtime(fileDate);
-        metadata.setMtime(fileDate);
-        metadata.setAtime(fileDate);
+        Path filePath = Path.of(file.getAbsolutePath());
+        BasicFileAttributes attrs = Files.readAttributes(filePath, BasicFileAttributes.class);
+
+        // Set the times from the file attributes
+        metadata.setCtime(new Date(attrs.creationTime().toMillis())); // File creation time
+        metadata.setMtime(new Date(attrs.lastModifiedTime().toMillis())); // File modification time
+        metadata.setAtime(new Date(attrs.lastAccessTime().toMillis())); // File access time
 
         // Set the path
         metadata.setPath(file.getAbsolutePath());
